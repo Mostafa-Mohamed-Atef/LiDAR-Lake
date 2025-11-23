@@ -3,6 +3,9 @@
 A scalable, automated, and high-performance platform for processing LiDAR data used in autonomous vehicles.
 This project enables reliable ingestion, cleaning, transformation, and analysis of massive 3D point-cloud datasets.
 
+![WhatsApp Image 2025-11-21 at 19 48 55_b60ab510](https://github.com/user-attachments/assets/52a74ace-5db7-4626-bb44-b2549371190b)
+
+
 ---
 
 ## 👥 Team Members
