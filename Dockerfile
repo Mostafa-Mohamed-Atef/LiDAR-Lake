@@ -1,27 +1,15 @@
-FROM python:3.11-slim
+FROM flink:1.19.1-java11
 
-WORKDIR /app
+# Install Python and dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install system dependencies
-# RUN apt-get update && apt-get install -y \
-#     build-essential \
-#     gcc \
-#     g++ \
-#     && rm -rf /var/lib/apt/lists/*
+# Install PyFlink and Kafka dependencies
+RUN pip3 install --no-cache-dir \
+    apache-flink==1.19.1 \
+    confluent-kafka
 
-# Copy requirements file
-COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application files
-COPY to_parquet.py .
-COPY data_streaming.py .
-
-# Set environment variables
-# Note: KAFKA_BROKER should be set via docker-compose.yaml
-ENV PYTHONUNBUFFERED=1
-
-# Default command
-CMD ["bash"]
+# Link python3 to python so Flink can find it
+RUN ln -s /usr/bin/python3 /usr/bin/python
