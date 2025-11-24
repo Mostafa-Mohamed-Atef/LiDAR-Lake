@@ -7,6 +7,9 @@ from pyflink.common import Types
 from pyflink.common.serialization import SimpleStringSchema
 from pyflink.datastream import StreamExecutionEnvironment, CheckpointingMode
 from pyflink.datastream.connectors import FlinkKafkaConsumer, FlinkKafkaProducer
+from pyflink.datastream.connectors.file_system import FileSink, OutputFileConfig
+from pyflink.datastream.functions import SinkFunction
+from pyflink.common.serialization import SimpleStringSchema
 
 
 # === Inline noise_filters module ===
@@ -56,6 +59,8 @@ KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka:9092")
 RAW_TOPIC = os.getenv("RAW_TOPIC", "lidar-stream")
 CLEAN_TOPIC = os.getenv("CLEAN_TOPIC", "lidar-clean")
 DIRTY_TOPIC = os.getenv("DIRTY_TOPIC", "lidar-dirty")
+HDFS_OUTPUT_CLEAN = os.getenv("HDFS_OUTPUT_CLEAN", "hdfs://namenode:8020/lidar/clean/")
+HDFS_OUTPUT_DIRTY = os.getenv("HDFS_OUTPUT_DIRTY", "hdfs://namenode:8020/lidar/dirty/")
 PARALLELISM = int(os.getenv("FLINK_PARALLELISM", "2"))
 
 
@@ -142,6 +147,8 @@ def main():
     print(f"Raw Topic: {RAW_TOPIC}", file=sys.stderr)
     print(f"Clean Topic: {CLEAN_TOPIC}", file=sys.stderr)
     print(f"Dirty Topic: {DIRTY_TOPIC}", file=sys.stderr)
+    print(f"HDFS Clean Output: {HDFS_OUTPUT_CLEAN}", file=sys.stderr)
+    print(f"HDFS Dirty Output: {HDFS_OUTPUT_DIRTY}", file=sys.stderr)
     
     env = build_env()
 
@@ -155,13 +162,45 @@ def main():
     clean_records = cleaned.filter(CleanRecordFilter())
     dirty_records = cleaned.filter(DirtyRecordFilter())
 
-    # Sink: Send clean records to clean topic
+    # Sink to Kafka Topics
     clean_records.add_sink(kafka_producer(CLEAN_TOPIC, KAFKA_BROKER))
     print(f"Clean records -> {CLEAN_TOPIC}", file=sys.stderr)
 
-    # Sink: Send dirty records to dirty topic
     dirty_records.add_sink(kafka_producer(DIRTY_TOPIC, KAFKA_BROKER))
     print(f"Dirty records -> {DIRTY_TOPIC}", file=sys.stderr)
+
+    # Sink to HDFS (Parquet format)
+    clean_sink = (
+        FileSink.for_row_format(
+            HDFS_OUTPUT_CLEAN,
+            SimpleStringSchema()
+        )
+        .with_output_file_config(
+            OutputFileConfig.builder()
+            .with_part_prefix("clean-lidar")
+            .with_part_suffix(".json")
+            .build()
+        )
+        .build()
+    )
+    clean_records.sink_to(clean_sink)
+    print(f"Clean records -> {HDFS_OUTPUT_CLEAN}", file=sys.stderr)
+
+    dirty_sink = (
+        FileSink.for_row_format(
+            HDFS_OUTPUT_DIRTY,
+            SimpleStringSchema()
+        )
+        .with_output_file_config(
+            OutputFileConfig.builder()
+            .with_part_prefix("dirty-lidar")
+            .with_part_suffix(".json")
+            .build()
+        )
+        .build()
+    )
+    dirty_records.sink_to(dirty_sink)
+    print(f"Dirty records -> {HDFS_OUTPUT_DIRTY}", file=sys.stderr)
 
     # Execute the job
     env.execute("lidar-cleaning-job")
